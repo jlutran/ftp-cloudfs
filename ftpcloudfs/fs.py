@@ -155,6 +155,25 @@ class ObjectStorageFD(object):
 
     split_size = 0
 
+    def _find_collisions(self):
+        """Check if there are collisions with a renamed multi-part file"""
+        while True:
+            try:
+                self.conn.head_object(self.container, self.name)
+            except ClientException:
+                # the manifest doesn't exist, check for parts
+                try:
+                    self.conn.head_object(self.container, self.part_name)
+                except ClientException:
+                    # parts not found, no collision
+                    break
+                else:
+                    # collision found
+                    self.part_collision += 1
+            else:
+                # manifest exists so this is an overwrite of an existing multi-part object
+                break
+
     def __init__(self, connection, container, obj, mode):
         self.conn = connection
         self.container = container
@@ -164,6 +183,7 @@ class ObjectStorageFD(object):
         self.total_size = 0
         self.part_size = 0
         self.part = 0
+        self.part_collision = 0
         self.headers = dict()
         self.content_type = mimetypes.guess_type(self.name)[0]
         self.pending_copy_task = None
@@ -183,11 +203,19 @@ class ObjectStorageFD(object):
             logging.debug("read fd %r" % self.name)
         else: # write
             logging.debug("write fd %r" % self.name)
+
+            # check for collisions in case this is a multi-part file
+            if self.split_size:
+                self._find_collisions()
+
             self.obj = ChunkObject(self.conn, self.container, self.name, content_type=self.content_type)
 
     @property
     def part_base_name(self):
-        return "%s.part" % self.name
+        base_name = self.name
+        if self.part_collision:
+            base_name = "%s_%02d" % (base_name, self.part_collision)
+        return "%s.part" % base_name
 
     @property
     def part_name(self):
