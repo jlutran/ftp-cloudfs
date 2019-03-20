@@ -70,19 +70,22 @@
 # By default the operating system will assign a port.
 # passive-ports = (empty)
 
-# Auth 2.0 (Keystone), requires keystoneclient
+# Use OpenStack Identity Service (Keystone), requires keystoneclient.
 # keystone-auth = no
 
-# Region name to be used with Auth 2.0 (optional)
+# Identity API version to be used with Keystone auth..
+# keystone-auth-version = 2.0
+
+# Region name to be used with Keystone auth (optional)
 # keystone-region-name = (empty)
 
-# Tenant separator to be used with Auth 2.0 (eg. TENANT.USERNAME)
+# Tenant separator to be used with Keystone auth (eg. TENANT.USERNAME)
 # keystone-tenant-separator = .
 
-# Service type to be used with Auth 2.0.
+# Service type to be used with Keystone auth.
 # keystone-service-type = object-store
 
-# Endpoint type to be used with Auth 2.0.
+# Endpoint type to be used with Keystone auth.
 # keystone-endpoint-type = publicURL
 
 # Use Rackspace's ServiceNet internal network.

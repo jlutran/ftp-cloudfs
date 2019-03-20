@@ -671,7 +671,7 @@ class ObjectStorageFS(object):
         username - if None then don't make the connection (delayed auth)
         api_key
         authurl
-        keystone - optional for auth 2.0 (keystone)
+        keystone - optional, use Openstack Identity service (Keystone)
         hider_part_dirt - optional, hide multipart .part files
         snet - optional, use Rackspace's service network
         insecure - optional, allow using servers without checking their SSL certs
@@ -704,12 +704,19 @@ class ObjectStorageFS(object):
             logging.debug("keystone authurl=%r username=%r tenant_name=%r conf=%r" % (self.authurl, username, tenant_name, self.keystone))
 
             ks = self.keystone
-            kwargs["auth_version"] = "2.0"
-            kwargs["tenant_name"] = tenant_name
-            kwargs["os_options"] = dict(service_type=ks['service_type'],
-                                        endpoint_type=ks['endpoint_type'],
-                                        region_name=ks['region_name'],
-                                        )
+            kwargs["auth_version"] = ks['auth_version']
+            if ks['auth_version'] == "3":
+                kwargs["os_options"] = dict(service_type=ks['service_type'],
+                                            endpoint_type=ks['endpoint_type'],
+                                            region_name=ks['region_name'],
+                                            project_name=tenant_name,
+                                            )
+            else:
+                kwargs["tenant_name"] = tenant_name
+                kwargs["os_options"] = dict(service_type=ks['service_type'],
+                                            endpoint_type=ks['endpoint_type'],
+                                            region_name=ks['region_name'],
+                                            )
 
         self.conn = ProxyConnection(self._listdir_cache.memcache,
                                     user=username,
