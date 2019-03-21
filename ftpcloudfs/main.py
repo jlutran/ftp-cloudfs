@@ -124,6 +124,7 @@ class Main(object):
                                   'keystone-auth-version': '2.0',
                                   'keystone-region-name': None,
                                   'keystone-tenant-separator': default_ks_tenant_separator,
+                                  'keystone-domain-separator': '@',
                                   'keystone-service-type': default_ks_service_type,
                                   'keystone-endpoint-type': default_ks_endpoint_type,
                                   'rackspace-service-net' : 'no',
@@ -249,6 +250,13 @@ class Main(object):
                           help="Character used to separate tenant_name/username in Keystone auth" + \
                               " (default: TENANT%sUSERNAME)" % default_ks_tenant_separator)
 
+        parser.add_option('--keystone-domain-separator',
+                          type="str",
+                          dest="domain_separator",
+                          default=self.config.get('ftpcloudfs', 'keystone-domain-separator'),
+                          help="Character used to separate project_name/project_domain_name " + \
+                               "and username/user_domain_name in Keystone auth v3 (default: @)")
+
         parser.add_option('--keystone-service-type',
                           type="str",
                           dest="service_type",
@@ -277,7 +285,7 @@ class Main(object):
                     from keystoneclient.v2_0 import client as _test_ksclient
             except ImportError:
                 parser.error("OpenStack Identity Service (keystone) requires python-keystoneclient.")
-            keystone_keys = ('auth_version', 'region_name', 'tenant_separator', 'service_type', 'endpoint_type')
+            keystone_keys = ('auth_version', 'region_name', 'tenant_separator', 'domain_separator', 'service_type', 'endpoint_type')
             options.keystone = dict((key, getattr(options, key)) for key in keystone_keys)
 
         if not options.authurl:

@@ -701,17 +701,33 @@ class ObjectStorageFS(object):
             if self.keystone['tenant_separator'] in username:
                 tenant_name, username = username.split(self.keystone['tenant_separator'], 1)
 
-            logging.debug("keystone authurl=%r username=%r tenant_name=%r conf=%r" % (self.authurl, username, tenant_name, self.keystone))
-
             ks = self.keystone
             kwargs["auth_version"] = ks['auth_version']
             if ks['auth_version'] == "3":
+                try:
+                    project_name, project_domain_name = tenant_name.split(self.keystone['domain_separator'], 1)
+                except ValueError:
+                    project_name = tenant_name
+                    project_domain_name = 'default'
+
+                try:
+                    username, user_domain_name = username.split(self.keystone['domain_separator'], 1)
+                except ValueError:
+                    user_domain_name = 'default'
+
+                logging.debug("keystone project_name=%r project_domain_name=%r username=%r user_domain_name=%r" %
+                              (project_name, project_domain_name, username, user_domain_name))
+
                 kwargs["os_options"] = dict(service_type=ks['service_type'],
                                             endpoint_type=ks['endpoint_type'],
                                             region_name=ks['region_name'],
-                                            project_name=tenant_name,
+                                            project_name=project_name,
+                                            project_domain_name=project_domain_name,
+                                            user_domain_name=user_domain_name,
                                             )
             else:
+                logging.debug("keystone authurl=%r username=%r tenant_name=%r conf=%r" %
+                              (self.authurl, username, tenant_name, self.keystone))
                 kwargs["tenant_name"] = tenant_name
                 kwargs["os_options"] = dict(service_type=ks['service_type'],
                                             endpoint_type=ks['endpoint_type'],

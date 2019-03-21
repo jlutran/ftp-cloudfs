@@ -104,6 +104,10 @@ Options:
   --keystone-tenant-separator=TENANT_SEPARATOR
                         Character used to separate tenant_name/username in
                         Keystone auth (default: TENANT.USERNAME)
+  --keystone-domain-separator=DOMAIN_SEPARATOR
+                        Character used to separate project_name/project_domain_name
+                        and username/user_domain_name in Keystone auth v3
+                        (default: @)
   --keystone-service-type=SERVICE_TYPE
                         Service type to be used in Keystone auth (default:
                         object-store)
@@ -146,8 +150,11 @@ Optionally `OpenStack Identity Service`_ (Keystone) v2.0 or v3 can be used.
 Currently python-keystoneclient (0.3.2+ recommended) is required to use Keystone auth
 and it can be enabled with ``keystone-auth`` option.
 
-You can provide a tenant name in the FTP login user with TENANT.USERNAME (using a dot as
-separator). Please check the example configuration file for further details.
+With Keystone v2.0, you can provide a tenant name in the FTP login user with
+TENANT.USERNAME (using a dot as separator).
+With Keystone v3, you can also provide domain name in the FTP login user with
+PROJECT_NAME@PROJECT_DOMAIN_NAME.USERNAME@USER_DOMAIN_NAME (using @ as a separator).
+Please check the example configuration file for further details.
 
 .. _swauth: https://github.com/gholt/swauth
 .. _OpenStack Identity Service: https://developer.openstack.org/api-ref/identity/index.html
