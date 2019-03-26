@@ -128,6 +128,7 @@ class Main(object):
                                   'keystone-service-type': default_ks_service_type,
                                   'keystone-endpoint-type': default_ks_endpoint_type,
                                   'rackspace-service-net' : 'no',
+                                  'storage-policy' : None,
                                  })
 
         try:
@@ -269,6 +270,12 @@ class Main(object):
                           default=self.config.get('ftpcloudfs', 'keystone-endpoint-type'),
                           help="Endpoint type to be used in Keystone auth (default: %s)" % default_ks_endpoint_type)
 
+        parser.add_option('--storage-policy',
+                          type="str",
+                          dest="storage_policy",
+                          default=self.config.get('ftpcloudfs', 'storage-policy'),
+                          help="Allowed Swift storage policy")
+
         parser.add_option('--config',
                           type="str",
                           dest="config",
@@ -304,6 +311,7 @@ class Main(object):
         ObjectStorageFtpFS.insecure = self.options.insecure
         ObjectStorageFtpFS.keystone = self.options.keystone
         ObjectStorageFtpFS.memcache_hosts = self.options.memcache
+        ObjectStorageFtpFS.storage_policy = self.options.storage_policy
         ObjectStorageFtpFS.hide_part_dir = self.config.getboolean('ftpcloudfs', 'hide-part-dir')
         ObjectStorageFtpFS.snet = self.config.getboolean('ftpcloudfs', 'rackspace-service-net')
 

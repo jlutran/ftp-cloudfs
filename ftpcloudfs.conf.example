@@ -95,4 +95,8 @@
 # Use Rackspace's ServiceNet internal network.
 # rackspace-service-net = no
 
+# Swift storage policy to be used (optional)
+# Access to other containers will be denied
+# storage-policy = (empty)
+
 # EOF
