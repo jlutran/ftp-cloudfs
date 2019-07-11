@@ -121,6 +121,8 @@ Options:
                         Enable separate large object container feature (optional)
   --large-object-container-suffix=SUFFIX
                         Custom suffix append to segments container name (optional, default: _segments)
+  --user-agent=USER_AGENT
+                        Custom HTTP User-Agent value to be used (default: 'ftpcloudfs-<version>')
 
 The defaults can be changed using a configuration file (by default in
 /etc/ftpcloudfs.conf). Check the example file included in the package.

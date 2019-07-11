@@ -28,10 +28,11 @@ class ChunkObject(object):
                          'Content-Type': content_type or 'application/octet-stream',
                          'Transfer-Encoding': 'chunked',
                          'Connection': 'close',
-                         # User-Agent ?
+                         'User-Agent': conn.user_agent,
                          }
         if conn.real_ip:
             self.headers['X-Forwarded-For'] = conn.real_ip
+            self.headers['X-Client-IP'] = conn.real_ip
 
         logging.debug("ChunkedObject: path=%r, headers=%r" % (self.path, self.headers))
 

@@ -35,7 +35,7 @@ __all__ = ['ObjectStorageFS']
 
 class ProxyConnection(Connection):
     """
-    Add X-Forwarded-For header to all requests.
+    Add custom HTTP headers to all requests.
     """
 
     # max time to cache auth tokens (seconds), based on swift defaults
@@ -44,6 +44,7 @@ class ProxyConnection(Connection):
     def __init__(self, memcache, *args, **kwargs):
         self.memcache = memcache
         self.real_ip = None
+        self.user_agent = None
         self.ignore_auth_cache = False
         self.tenant_name = None
         if kwargs.get('auth_version') == "2.0":
@@ -60,6 +61,9 @@ class ProxyConnection(Connection):
                     headers = {}
                 if self.real_ip:
                     headers['X-Forwarded-For'] = self.real_ip
+                    headers['X-Client-IP'] = self.real_ip
+                if self.user_agent:
+                    headers['User-Agent'] = self.user_agent
                 fn(method, url, data=data, headers=headers)
             return request_header_injection
 
@@ -781,7 +785,7 @@ class ObjectStorageFS(object):
 
     @translate_objectstorage_error
     def __init__(self, username, api_key, authurl, keystone=None, hide_part_dir=False,
-                 snet=False, insecure=False, storage_policy=None):
+                 snet=False, insecure=False, storage_policy=None, user_agent=None):
         """
         Create the Object Storage connection.
 
@@ -793,6 +797,7 @@ class ObjectStorageFS(object):
         snet - optional, use Rackspace's service network
         insecure - optional, allow using servers without checking their SSL certs
         storage_policy - optional, Swift storage policy to be used
+        user_agent - optional, custom HTTP User-Agent header to be used
         """
         self.conn = None
         self.authurl = authurl
@@ -804,6 +809,7 @@ class ObjectStorageFS(object):
         self.storage_policy = storage_policy
         if storage_policy is not None:
             self.headers['X-Storage-Policy'] = storage_policy
+        self.user_agent = user_agent
         # A cache to hold the information from the last listdir
         self._listdir_cache = ListDirCache(self)
         self._cwd = '/'
@@ -869,6 +875,7 @@ class ObjectStorageFS(object):
                                     **kwargs
                                     )
         # force authentication
+        self.conn.user_agent = self.user_agent
         self.conn.url, self.conn.token = self.conn.get_auth()
         self.conn.close()
         # now we are authenticated and we have an username

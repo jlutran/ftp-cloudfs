@@ -106,4 +106,7 @@
 # Swift large files container suffix to be used (optional)
 # large-files-container-suffix = _segments
 
+# Custom HTTP User-Agent value (optional)
+# user-agent = ftpcloudfs-<version>
+
 # EOF

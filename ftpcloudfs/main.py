@@ -131,6 +131,7 @@ class Main(object):
                                   'storage-policy' : None,
                                   'large-object-container': 'no',
                                   'large-object-container-suffix': '_segments',
+                                  'user-agent': 'ftpcloudfs-%s' % version,
                                  })
 
         try:
@@ -290,6 +291,12 @@ class Main(object):
                           default=self.config.get('ftpcloudfs', 'large-object-container-suffix'),
                           help="Large object container suffix (default: '_segments')")
 
+        parser.add_option('--user-agent',
+                          type="str",
+                          dest="user_agent",
+                          default=self.config.get('ftpcloudfs', 'user-agent'),
+                          help="HTTP User-Agent header value (default: ftpcloudfs-<version>)")
+
         parser.add_option('--config',
                           type="str",
                           dest="config",
@@ -328,6 +335,7 @@ class Main(object):
         ObjectStorageFtpFS.storage_policy = self.options.storage_policy
         ObjectStorageFtpFS.hide_part_dir = self.config.getboolean('ftpcloudfs', 'hide-part-dir')
         ObjectStorageFtpFS.snet = self.config.getboolean('ftpcloudfs', 'rackspace-service-net')
+        ObjectStorageFtpFS.user_agent = self.options.user_agent
 
         try:
             # store bytes
