@@ -96,17 +96,23 @@ Options:
   --pid-file=PID_FILE   Pid file location when in daemon mode
   --uid=UID             UID to drop the privilige to when in daemon mode
   --gid=GID             GID to drop the privilige to when in daemon mode
-  --keystone-auth       Use auth 2.0 (Keystone, requires keystoneclient)
+  --keystone-auth       Use OpenStack Identity Service (Keystone, requires keystoneclient)
+  --keystone-auth-version=VERSION
+                        Identity API version to be used (default: 2.0)
   --keystone-region-name=REGION_NAME
-                        Region name to be used in auth 2.0
+                        Region name to be used in Keystone auth
   --keystone-tenant-separator=TENANT_SEPARATOR
                         Character used to separate tenant_name/username in
-                        auth 2.0 (default: TENANT.USERNAME)
+                        Keystone auth (default: TENANT.USERNAME)
+  --keystone-domain-separator=DOMAIN_SEPARATOR
+                        Character used to separate project_name/project_domain_name
+                        and username/user_domain_name in Keystone auth v3
+                        (default: @)
   --keystone-service-type=SERVICE_TYPE
-                        Service type to be used in auth 2.0 (default: object-
-                        store)
+                        Service type to be used in Keystone auth (default:
+                        object-store)
   --keystone-endpoint-type=ENDPOINT_TYPE
-                        Endpoint type to be used in auth 2.0 (default:
+                        Endpoint type to be used in Keystone auth (default:
                         publicURL)
 
 The defaults can be changed using a configuration file (by default in
@@ -133,21 +139,25 @@ possible to associate a token with a specific user (not trivial) or even use the
 cache key (MD5 hash) to brute-force the user password.
 
 
-AUTH 2.0
+OPENSTACK IDENTITY SERVICE (KEYSTONE)
 ========
 
 By default ftp-cloudfs will use Swift auth 1.0, that is compatible with `OpenStack Object Storage`
 using `swauth`_ auth middleware and Swift implementations such as `Rackspace Cloud Files` or
 `Memset's Memstore Cloud Storage`.
 
-Optionally `OpenStack Identity Service 2.0`_ can be used. Currently python-keystoneclient (0.3.2+
-recommended) is required to use auth 2.0 and it can be enabled with ``keystone-auth`` option.
+Optionally `OpenStack Identity Service`_ (Keystone) v2.0 or v3 can be used.
+Currently python-keystoneclient (0.3.2+ recommended) is required to use Keystone auth
+and it can be enabled with ``keystone-auth`` option.
 
-You can provide a tenant name in the FTP login user with TENANT.USERNAME (using a dot as
-separator). Please check the example configuration file for further details.
+With Keystone v2.0, you can provide a tenant name in the FTP login user with
+TENANT.USERNAME (using a dot as separator).
+With Keystone v3, you can also provide domain name in the FTP login user with
+PROJECT_NAME@PROJECT_DOMAIN_NAME.USERNAME@USER_DOMAIN_NAME (using @ as a separator).
+Please check the example configuration file for further details.
 
 .. _swauth: https://github.com/gholt/swauth
-.. _OpenStack Identity Service 2.0: http://docs.openstack.org/api/openstack-identity-service/2.0/content/index.html
+.. _OpenStack Identity Service: https://developer.openstack.org/api-ref/identity/index.html
 .. _RackSpace Cloud Files: http://www.rackspace.com/cloud/cloud_hosting_products/files/
 .. _Memset's Memstore Cloud Storage: https://www.memset.com/cloud/storage/
 
