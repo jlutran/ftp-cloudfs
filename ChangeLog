@@ -1,6 +1,6 @@
 2019-07-12 Juan J. Martinez <jjm@usebox.net>
 
- * 0.36
+ * 0.36.1
  - Keystone auth v3 support thanks to Julien Lutran
  - Avoid multi-part files' collisions with renamed files
  - Better error reporting reading config files
