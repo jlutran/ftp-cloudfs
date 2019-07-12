@@ -70,7 +70,7 @@ ftp-cloudfs has been `included in Debian Jessie`_.
 
 
 USAGE
-======
+=====
 
 The install should have created a /usr/bin/ftpcloudfs (or whatever
 prefix defined in your python distribution or command line arguments)
@@ -140,7 +140,7 @@ cache key (MD5 hash) to brute-force the user password.
 
 
 OPENSTACK IDENTITY SERVICE (KEYSTONE)
-========
+=====================================
 
 By default ftp-cloudfs will use Swift auth 1.0, that is compatible with `OpenStack Object Storage`
 using `swauth`_ auth middleware and Swift implementations such as `Rackspace Cloud Files` or
