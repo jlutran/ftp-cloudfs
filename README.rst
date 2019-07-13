@@ -153,7 +153,7 @@ and it can be enabled with ``keystone-auth`` option.
 With Keystone v2.0, you can provide a tenant name in the FTP login user with
 TENANT.USERNAME (using a dot as separator).
 With Keystone v3, you can also provide domain name in the FTP login user with
-PROJECT_NAME@PROJECT_DOMAIN_NAME.USERNAME@USER_DOMAIN_NAME (using @ as a separator).
+`PROJECT_NAME@PROJECT_DOMAIN_NAME.USERNAME@USER_DOMAIN_NAME` (using @ as a separator).
 Please check the example configuration file for further details.
 
 .. _swauth: https://github.com/gholt/swauth
