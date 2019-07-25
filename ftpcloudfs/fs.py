@@ -154,6 +154,7 @@ class ObjectStorageFD(object):
     """File alike object attached to the Object Storage."""
 
     split_size = 0
+    storage_policy = None
 
     def _find_collisions(self):
         """Check if there are collisions with a renamed multi-part file"""
@@ -234,6 +235,8 @@ class ObjectStorageFD(object):
             url, token = conn.get_auth()
             conn = ProxyConnection(None, preauthurl=url, preauthtoken=token, insecure=conn.insecure)
             headers = { 'x-copy-from': quote("/%s/%s" % (container, name)) }
+            if self.storage_policy is not None:
+                headers.update({ 'x-storage-policy': quote(self.storage_policy) })
             logging.debug("copying first part %r/%r, %r" % (container, part_name, headers))
             try:
                 conn.put_object(container, part_name, headers=headers, contents=None)
@@ -242,6 +245,8 @@ class ObjectStorageFD(object):
                 sys.exit(1)
             # setup the manifest
             headers = { 'x-object-manifest': quote("%s/%s" % (container, part_base_name)) }
+            if self.storage_policy is not None:
+                headers.update({ 'x-storage-policy': quote(self.storage_policy) })
             logging.debug("creating manifest %r/%r, %r" % (container, name, headers))
             try:
                 conn.put_object(container, name, headers=headers, contents=None)
@@ -553,6 +558,11 @@ class ListDirCache(object):
             # the containers we have permissions to access to
             return
         for obj in objects:
+            if self.cffs.storage_policy is not None:
+                meta = self.conn.head_container(obj['name'])
+                if meta['x-storage-policy'] != self.cffs.storage_policy:
+                    logging.debug("blacklisting container {} ({})".format(obj['name'], meta['x-storage-policy']))
+                    continue
             # {u'count': 0, u'bytes': 0, u'name': u'container1'},
             # Keep all names in utf-8, just like the filesystem
             name = obj['name'].encode("utf-8")
@@ -637,6 +647,9 @@ class ListDirCache(object):
                 if directory == '/' and leaf:
                     try:
                         container = self.conn.head_container(leaf)
+                        if (self.cffs.storage_policy is not None and
+                            container['x-storage-policy'] != self.cffs.storage_policy):
+                            raise IOSError(ENOENT, 'No such file or directory %s' % leaf)
                     except ClientException:
                         raise IOSError(ENOENT, 'No such file or directory %s' % leaf)
 
@@ -664,7 +677,8 @@ class ObjectStorageFS(object):
     memcache_hosts = None
 
     @translate_objectstorage_error
-    def __init__(self, username, api_key, authurl, keystone=None, hide_part_dir=False, snet=False, insecure=False):
+    def __init__(self, username, api_key, authurl, keystone=None, hide_part_dir=False,
+                 snet=False, insecure=False, storage_policy=None):
         """
         Create the Object Storage connection.
 
@@ -675,6 +689,7 @@ class ObjectStorageFS(object):
         hider_part_dirt - optional, hide multipart .part files
         snet - optional, use Rackspace's service network
         insecure - optional, allow using servers without checking their SSL certs
+        storage_policy - optional, Swift storage policy to be used
         """
         self.conn = None
         self.authurl = authurl
@@ -682,6 +697,10 @@ class ObjectStorageFS(object):
         self.hide_part_dir = hide_part_dir
         self.snet = snet
         self.insecure = insecure
+        self.headers = dict()
+        self.storage_policy = storage_policy
+        if storage_policy is not None:
+            self.headers['X-Storage-Policy'] = storage_policy
         # A cache to hold the information from the last listdir
         self._listdir_cache = ListDirCache(self)
         self._cwd = '/'
@@ -831,11 +850,11 @@ class ObjectStorageFS(object):
             self._listdir_cache.flush(posixpath.dirname(path))
             logging.debug("Making directory %r in %r" % (obj, container))
             self._container_exists(container)
-            self.conn.put_object(container, obj, contents=None, content_type="application/directory")
+            self.conn.put_object(container, obj, contents=None, content_type="application/directory", headers=self.headers)
         else:
             self._listdir_cache.flush("/")
             logging.debug("Making container %r" % (container,))
-            self.conn.put_container(container)
+            self.conn.put_container(container, headers=self.headers)
 
     @close_when_done
     @translate_objectstorage_error
@@ -929,7 +948,7 @@ class ObjectStorageFS(object):
         logging.debug("rename container %r -> %r" % (src_container_name, dst_container_name))
         # Delete the old container first, raising error if not empty
         self.conn.delete_container(src_container_name)
-        self.conn.put_container(dst_container_name)
+        self.conn.put_container(dst_container_name, headers=self.headers)
         self._listdir_cache.flush("/")
 
     @close_when_done
@@ -984,11 +1003,11 @@ class ObjectStorageFS(object):
         meta = self.conn.head_object(src_container_name, src_path)
         if 'x-object-manifest' in meta:
             # a manifest file
-            headers = { 'x-object-manifest': quote(meta['x-object-manifest']) }
+            self.headers.update({ 'x-object-manifest': quote(meta['x-object-manifest']) })
         else:
             # regular file
-            headers = { 'x-copy-from': quote("/%s/%s" % (src_container_name, src_path)) }
-        self.conn.put_object(dst_container_name, dst_path, headers=headers, contents=None)
+            self.headers.update({ 'x-copy-from': quote("/%s/%s" % (src_container_name, src_path)) })
+        self.conn.put_object(dst_container_name, dst_path, headers=self.headers, contents=None)
         # Delete src
         self.conn.delete_object(src_container_name, src_path)
         self._listdir_cache.flush(posixpath.dirname(src))

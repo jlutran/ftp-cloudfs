@@ -114,6 +114,9 @@ Options:
   --keystone-endpoint-type=ENDPOINT_TYPE
                         Endpoint type to be used in Keystone auth (default:
                         publicURL)
+  --storage-policy=STORAGE_POLICY
+                        Swift storage policy to be used (optional)
+                        Access to other containers will be denied
 
 The defaults can be changed using a configuration file (by default in
 /etc/ftpcloudfs.conf). Check the example file included in the package.
@@ -178,6 +181,21 @@ store the manifest. If the original file is downloaded, the parts will be served
 The *FILE.part* directory can be removed from directory listings using the *hide-part-dir* configuration
 token. Please be aware that the directory will still be visible when accessing the storage using
 swift API.
+
+
+STORAGE POLICIES
+================
+
+Swift storage policies may be used to add some level of segmentation inside a single Swift cluster :
+durability levels (Replication / Erasure Coding), storage backend performance (SSD vs HDD), ...
+
+With storage_policy paramter, you can restrict user access to a single policy : If no name is specified,
+the default policy is used (and if no other policies, defined Policy-0 is considered the default).
+Policy-0 is what is used by Swift when accessing pre-storage-policy containers which won’t have a policy.
+
+See `Openstack Storage Policies` for implementation details.
+
+.. _Openstack Storage Policies: https://docs.openstack.org/swift/latest/overview_policies.html
 
 
 SUPPORT

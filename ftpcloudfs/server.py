@@ -18,8 +18,9 @@ class ObjectStorageFtpFS(ObjectStorageFS, AbstractedFS):
     keystone = None
     hide_part_dir = None
     snet = False
+    storage_policy = None
 
-    def __init__(self, username, api_key, authurl=None, keystone=None, hide_part_dir=None):
+    def __init__(self, username, api_key, authurl=None, keystone=None, hide_part_dir=None, storage_policy=None):
         ObjectStorageFS.__init__(self,
                                  username,
                                  api_key,
@@ -28,6 +29,7 @@ class ObjectStorageFtpFS(ObjectStorageFS, AbstractedFS):
                                  hide_part_dir=hide_part_dir or self.hide_part_dir,
                                  snet = self.snet,
                                  insecure = self.insecure,
+                                 storage_policy=storage_policy,
                                  )
 
     def init_abstracted_fs(self, root, cmd_channel):
