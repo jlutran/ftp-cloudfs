@@ -717,20 +717,26 @@ class ObjectStorageFS(object):
         tenant_name = None
 
         if self.keystone:
-            if self.keystone['tenant_separator'] in username:
-                tenant_name, username = username.split(self.keystone['tenant_separator'], 1)
-
             ks = self.keystone
+
+            if ks['tenant_separator'] in username:
+                tenant_name, username = username.split(ks['tenant_separator'], 1)
+            else:
+                try:
+                    tenant_name, username, api_key = api_key.split(ks['tenant_separator'], 2)
+                except ValueError:
+                    raise ClientException("Failed to parse api_key: %s" % api_key)
+
             kwargs["auth_version"] = ks['auth_version']
             if ks['auth_version'] == "3":
                 try:
-                    project_name, project_domain_name = tenant_name.split(self.keystone['domain_separator'], 1)
+                    project_name, project_domain_name = tenant_name.split(ks['domain_separator'], 1)
                 except ValueError:
                     project_name = tenant_name
                     project_domain_name = 'default'
 
                 try:
-                    username, user_domain_name = username.split(self.keystone['domain_separator'], 1)
+                    username, user_domain_name = username.split(ks['domain_separator'], 1)
                 except ValueError:
                     user_domain_name = 'default'
 
@@ -746,7 +752,7 @@ class ObjectStorageFS(object):
                                             )
             else:
                 logging.debug("keystone authurl=%r username=%r tenant_name=%r conf=%r" %
-                              (self.authurl, username, tenant_name, self.keystone))
+                              (self.authurl, username, tenant_name, ks))
                 kwargs["tenant_name"] = tenant_name
                 kwargs["os_options"] = dict(service_type=ks['service_type'],
                                             endpoint_type=ks['endpoint_type'],
