@@ -99,4 +99,11 @@
 # Access to other containers will be denied
 # storage-policy = (empty)
 
+# Swift large files container to be used (optional)
+# If not set, large files wll be uploaded to <container>/<object>.part dir
+# large-files-container = no
+
+# Swift large files container suffix to be used (optional)
+# large-files-container-suffix = _segments
+
 # EOF

@@ -157,6 +157,7 @@ class ObjectStorageFD(object):
 
     split_size = 0
     storage_policy = None
+    large_object_container_suffix = None
 
     def _find_collisions(self):
         """Check if there are collisions with a renamed multi-part file"""
@@ -177,6 +178,25 @@ class ObjectStorageFD(object):
                 # manifest exists so this is an overwrite of an existing multi-part object
                 break
 
+    def _fetch_manifest_info(self):
+        """
+        Get the current object type to cleanup outdated (or orphaned)
+        segments once write process is done (or failed).
+        """
+        try:
+            meta = self.conn.head_object(self.container, self.name)
+            if 'x-object-manifest' in meta:
+                self.x_object_manifest = quote(meta['x-object-manifest'])
+            elif 'x-static-large-object' in meta:
+                _, self.slo_manifest = self.conn.get_object(self.container, self.name,
+                                                            query_string="multipart-manifest=get&format=json")
+        except ClientException, e:
+            if e.http_status == 404:
+                # Object does not exists yet
+                pass
+            else:
+                raise IOSError(ENOENT, "Failed to read object %s metadata." % self.name)
+
     def __init__(self, connection, container, obj, mode):
         self.conn = connection
         self.container = container
@@ -190,6 +210,12 @@ class ObjectStorageFD(object):
         self.headers = dict()
         self.content_type = mimetypes.guess_type(self.name)[0]
         self.pending_copy_task = None
+        self.timestamp = int(time.time())
+        self.large_object_container = None
+        if self.large_object_container_suffix is not None:
+            self.large_object_container = ''.join([self.container, self.large_object_container_suffix])
+        self.x_object_manifest = None
+        self.slo_manifest = dict()
 
         self.obj = None
 
@@ -209,29 +235,53 @@ class ObjectStorageFD(object):
 
             # check for collisions in case this is a multi-part file
             if self.split_size:
-                self._find_collisions()
+                if self.large_object_container is None:
+                    self._find_collisions()
+                else:
+                    self._fetch_manifest_info()
 
             self.obj = ChunkObject(self.conn, self.container, self.name, content_type=self.content_type)
 
     @property
     def part_base_name(self):
         base_name = self.name
+        if self.large_object_container is not None:
+            logging.debug("large object part_base_name=%s/%d/%s" % (self.name, self.timestamp, self.split_size))
+            return "%s/%d/%s" % (self.name, self.timestamp, self.split_size)
         if self.part_collision:
             base_name = "%s_%02d" % (base_name, self.part_collision)
         return "%s.part" % base_name
 
     @property
     def part_name(self):
+        if self.large_object_container is not None:
+            logging.debug("large object part_name=%s/%d/%s/%.8d" % (self.name, self.timestamp, self.split_size, self.part))
+            return "%s/%d/%s/%.8d" % (self.name, self.timestamp, self.split_size, self.part)
         return "%s/%.6d" % (self.part_base_name, self.part)
 
     def _start_copy_task(self):
         """
-        Copy the first part of a multi-part file to its final location and create
-        the manifest file.
+        Copy the first part of a multi-part file to its final location.
 
         This happens in the background, pending_copy_task must be cleaned up at
         the end.
+
+        Also creates the large object container if needed.
         """
+        if self.large_object_container is not None:
+            try:
+                self.conn.head_container(self.large_object_container)
+            except ClientException, e:
+                if e.http_status == 404:
+                    if self.storage_policy is not None:
+                        self.headers.update({'x-storage-policy': quote(self.storage_policy)})
+                    logging.debug("creating large object container: %s" % self.large_object_container)
+                    try:
+                        self.conn.put_container(self.large_object_container, headers=self.headers)
+                    except ClientException, e:
+                        logging.error("Failed to create container %s: %s" % (self.large_object_container, e.http_reason))
+                        sys.exit(1)
+
         def copy_task(conn, container, name, part_name, part_base_name):
             # open a new connection
             url, token = conn.get_auth()
@@ -239,24 +289,20 @@ class ObjectStorageFD(object):
             headers = { 'x-copy-from': quote("/%s/%s" % (container, name)) }
             if self.storage_policy is not None:
                 headers.update({ 'x-storage-policy': quote(self.storage_policy) })
-            logging.debug("copying first part %r/%r, %r" % (container, part_name, headers))
             try:
-                conn.put_object(container, part_name, headers=headers, contents=None)
+                if self.large_object_container is not None:
+                    logging.debug("copying large first part %r/%r, %r" % (self.large_object_container, part_name, headers))
+                    conn.put_object(self.large_object_container, part_name, headers=headers, contents=None)
+                else:
+                    logging.debug("copying first part %r/%r, %r" % (container, part_name, headers))
+                    conn.put_object(container, part_name, headers=headers, contents=None)
             except ClientException as ex:
                 logging.error("Failed to copy %s: %s" % (name, ex.http_reason))
                 sys.exit(1)
-            # setup the manifest
-            headers = { 'x-object-manifest': quote("%s/%s" % (container, part_base_name)) }
-            if self.storage_policy is not None:
-                headers.update({ 'x-storage-policy': quote(self.storage_policy) })
-            logging.debug("creating manifest %r/%r, %r" % (container, name, headers))
-            try:
-                conn.put_object(container, name, headers=headers, contents=None)
-            except ClientException as ex:
-                logging.error("Failed to store the manifest %s: %s" % (name, ex.http_reason))
-                sys.exit(1)
+
             logging.debug("copy task done")
             conn.close()
+
         self.pending_copy_task = multiprocessing.Process(target=copy_task,
                                                          args=(self.conn,
                                                                self.container,
@@ -266,6 +312,42 @@ class ObjectStorageFD(object):
                                                                ),
                                                          )
         self.pending_copy_task.start()
+
+    def upload_manifest(self):
+        contents = None
+        if self.large_object_container is not None:
+            contents = []
+            for part in range(self.part+1):
+                contents.append({ 'path': quote("/%s/%s/%.8d" % (self.large_object_container, self.part_base_name, part)) })
+            contents = json.dumps(contents)
+        if self.storage_policy is not None:
+            headers = { 'x-storage-policy': quote(self.storage_policy) }
+        logging.debug("creating manifest %r/%r, headers=%r, contents=%s" % (self.container, self.name, headers, contents))
+        try:
+            self.conn.put_object(self.container, self.name, headers=headers, contents=contents, query_string="multipart-manifest=put")
+        except ClientException as ex:
+            logging.error("Failed to store the manifest %s: %s" % (self.name, ex.http_reason))
+            self.delete_orphaned_segments(self.part_base_name)
+            sys.exit(1)
+
+    def delete_orphaned_segments(self, prefix=None):
+        container = None
+        if prefix is None:
+            objects = json.loads(self.slo_manifest)
+            logging.debug("delete orphaned segments from slo manifest=%s" % objects)
+        else:
+            logging.debug("searching for orphaned segments on container %s with prefix %s" % (self.large_object_container, prefix))
+            _, objects = self.conn.get_container(self.large_object_container, prefix=prefix)
+
+        for obj in objects:
+            if prefix is None:
+                _, container, name = obj['name'].split('/', 2)
+            else:
+                container = self.large_object_container
+                name = obj['name']
+            logging.debug("deleting orphaned segment: %s/%s" % (container, name))
+            self.conn.delete_object(container, name)
+
 
     @translate_objectstorage_error
     def write(self, data):
@@ -285,7 +367,13 @@ class ObjectStorageFD(object):
                     current_size = len(data)-offs
                 self.part_size += current_size
                 if not self.obj:
-                    self.obj = ChunkObject(self.conn, self.container, self.part_name, content_type=self.content_type, reuse_token=False)
+                    if self.large_object_container is not None:
+                        logging.debug("Writing object %s to container %s" % (self.part_name, self.large_object_container))
+                        self.obj = ChunkObject(self.conn, self.large_object_container, self.part_name,
+                                               content_type=self.content_type, reuse_token=False)
+                    else:
+                        self.obj = ChunkObject(self.conn, self.container, self.part_name,
+                                               content_type=self.content_type, reuse_token=False)
                 self.obj.send_chunk(data[offs:offs+current_size])
                 offs += current_size
                 if self.part_size == self.split_size:
@@ -310,9 +398,22 @@ class ObjectStorageFD(object):
                 self.pending_copy_task.join()
                 logging.debug("wait is over")
                 if self.pending_copy_task.exitcode != 0:
+                    # Cleanup orphaned segments.
+                    # We can only use prefix mode here since manifest has not been uploaded yet.
+                    if self.large_object_container is not None:
+                        self.delete_orphaned_segments(self.part_base_name)
                     raise IOSError(EIO, 'Failed to store the file')
             if self.obj is not None:
                 self.obj.finish_chunk()
+            if self.part > 0:
+                self.upload_manifest()
+            # Cleanup outdated segments
+            if self.large_object_container is not None:
+                if self.x_object_manifest is not None:
+                    prefix = self.x_object_manifest.split("/", 1)[1]
+                    self.delete_orphaned_segments(prefix)
+                elif self.slo_manifest:
+                    self.delete_orphaned_segments()
         self.obj = None
         self.closed = True
         self.conn.close()
@@ -938,9 +1039,12 @@ class ObjectStorageFS(object):
             raise IOSError(EACCES, "Can't remove a directory (use rmdir instead)")
 
         meta = self.conn.head_object(container, name)
+        query_string = None
         if 'x-object-manifest' in meta:
             self._remove_path_folder_files(u'/' + smart_unicode(unquote(meta['x-object-manifest']), "utf-8"))
-        self.conn.delete_object(container, name)
+        elif 'x-static-large-object' in meta:
+            query_string="multipart-manifest=delete"
+        self.conn.delete_object(container, name, query_string=query_string)
         self._listdir_cache.flush(posixpath.dirname(path))
         return not name
 
@@ -1009,13 +1113,17 @@ class ObjectStorageFS(object):
 
         # Do the rename of the file/dir
         meta = self.conn.head_object(src_container_name, src_path)
+        query_string = None
         if 'x-object-manifest' in meta:
-            # a manifest file
+            # DLO manifest file
             self.headers.update({ 'x-object-manifest': quote(meta['x-object-manifest']) })
         else:
-            # regular file
+            # SLO manifest file or regular object
+            if 'x-static-large-object' in meta:
+                query_string = "multipart-manifest=get"
             self.headers.update({ 'x-copy-from': quote("/%s/%s" % (src_container_name, src_path)) })
-        self.conn.put_object(dst_container_name, dst_path, headers=self.headers, contents=None)
+        self.conn.put_object(dst_container_name, dst_path, headers=self.headers,
+                             contents=None, query_string=query_string)
         # Delete src
         self.conn.delete_object(src_container_name, src_path)
         self._listdir_cache.flush(posixpath.dirname(src))
