@@ -40,6 +40,8 @@ class ObjectStorageFSTest(unittest.TestCase):
         self.container = "ftpcloudfs_testing"
         self.cnx.mkdir("/%s" % self.container)
         self.cnx.chdir("/%s" % self.container)
+        self.large_object_container = self.container + "_segments"
+        self.cnx.mkdir("/%s" % self.large_object_container)
 
     def create_file(self, path, contents):
         '''Create path with contents'''
@@ -665,13 +667,56 @@ class ObjectStorageFSTest(unittest.TestCase):
         self.cnx.remove("testfile.txt.part/000001")
         self.cnx.remove("testfile2.txt")
 
+    def test_large_object_container_support(self):
+        size = 1024**2
+        part_size = 64*1024
+        obj_name = "testfile.txt"
+        fd = self.cnx.open(obj_name, "wb")
+        fd.split_size = part_size
+        fd.large_object_container = self.container + "_segments"
+        content = ''
+        for part in xrange(size/4096):
+            content += chr(part)*4096
+            fd.write(chr(part)*4096)
+        fd.close()
+        self.assertEqual(self.cnx.listdir("."), [obj_name])
+        self.assertEqual(self.cnx.getsize(obj_name), size)
+        self.assertEqual(self.cnx.listdir("/%s/" % fd.large_object_container), [obj_name])
+        ts = self.cnx.listdir("/%s/%s" % (fd.large_object_container, obj_name))
+        self.assertEqual(len(ts), 1)
+        self.assertEqual(len(self.cnx.listdir("/%s/%s/%s/%s/" % (fd.large_object_container, obj_name, bytes(ts[0]), part_size))), size/part_size)
+        self.assertEqual(self.cnx.getsize(obj_name), size)
+        stored_content = self.read_file("/%s/%s" % (self.container, obj_name))
+        self.assertEqual(stored_content, content)
+        self.cnx.remove(obj_name)
+        self.assertEqual(self.cnx.listdir("/%s/" % fd.large_object_container), [])
+
+    def test_large_object_container_rename(self):
+        size = 1024**2
+        part_size = 64*1024
+        fd = self.cnx.open("testfile.txt", "wb")
+        fd.split_size = part_size
+        fd.large_object_container = self.container + "_segments"
+        content = ''
+        for part in xrange(size/4096):
+            content += chr(part)*4096
+            fd.write(chr(part)*4096)
+        fd.close()
+        self.cnx.rename("testfile.txt", "testfile2.txt")
+        _, objects = self.conn.get_container(self.container)
+        self.assertEqual(self._search_file_by_name(objects, 'testfile2.txt')['bytes'], size)
+        stored_content = self.read_file('testfile2.txt')
+        self.assertEqual(stored_content, content)
+        self.cnx.remove("testfile2.txt")
+
     def tearDown(self):
-        # Delete eveything from the container using the API
-        _, fails = self.conn.get_container(self.container)
-        for obj in fails:
-            self.conn.delete_object(self.container, obj["name"])
-        self.cnx.rmdir("/%s" % self.container)
-        self.assertEquals(fails, [], "The test failed to clean up after itself leaving these objects: %r" % fails)
+        for container in [self.container, self.large_object_container]:
+            # Delete eveything from the container using the API
+            _, fails = self.conn.get_container(container)
+            for obj in fails:
+                self.conn.delete_object(container, obj["name"])
+            self.cnx.rmdir("/%s" % container)
+            self.assertEquals(fails, [], "The test failed to clean up %s container after itself leaving these objects: %r" % (container, fails))
 
     def _search_file_by_name(self, container_files, file_name):
         file_list = [file for file in container_files if file['name'] == file_name]

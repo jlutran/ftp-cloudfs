@@ -117,6 +117,10 @@ Options:
   --storage-policy=STORAGE_POLICY
                         Swift storage policy to be used (optional)
                         Access to other containers will be denied
+  --large-object-container
+                        Enable separate large object container feature (optional)
+  --large-object-container-suffix=SUFFIX
+                        Custom suffix append to segments container name (optional, default: _segments)
 
 The defaults can be changed using a configuration file (by default in
 /etc/ftpcloudfs.conf). Check the example file included in the package.
@@ -178,10 +182,17 @@ When a *FILE* is larger than the specified amount of MB, a *FILE.part* directory
 *n* parts will be created splitting the file automatically. The original file name will be used to
 store the manifest. If the original file is downloaded, the parts will be served as it was a single file.
 
+As an alternative, you can set *large-object-container* option to store parts on another container.
+Default container name will be <container>_segments unless you specify another suffix with
+*large-object-container-suffix*. This implementation tries to emulate official `python-swiftclient`_
+behavior as described in `Large Object Support`_ documentation.
+
 The *FILE.part* directory can be removed from directory listings using the *hide-part-dir* configuration
 token. Please be aware that the directory will still be visible when accessing the storage using
 swift API.
 
+.. _python-swiftclient: https://github.com/openstack/python-swiftclient
+.. _Large Object Support: https://docs.openstack.org/swift/latest/overview_large_objects.html
 
 STORAGE POLICIES
 ================

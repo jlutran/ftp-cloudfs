@@ -129,6 +129,8 @@ class Main(object):
                                   'keystone-endpoint-type': default_ks_endpoint_type,
                                   'rackspace-service-net' : 'no',
                                   'storage-policy' : None,
+                                  'large-object-container': 'no',
+                                  'large-object-container-suffix': '_segments',
                                  })
 
         try:
@@ -276,6 +278,18 @@ class Main(object):
                           default=self.config.get('ftpcloudfs', 'storage-policy'),
                           help="Allowed Swift storage policy")
 
+        parser.add_option('--large-object-container',
+                          action="store_true",
+                          dest="large_object_container",
+                          default=self.config.getboolean('ftpcloudfs', 'large-object-container'),
+                          help="Enable large object container support")
+
+        parser.add_option('--large-object-container-suffix',
+                          type="str",
+                          dest="large_object_container_suffix",
+                          default=self.config.get('ftpcloudfs', 'large-object-container-suffix'),
+                          help="Large object container suffix (default: '_segments')")
+
         parser.add_option('--config',
                           type="str",
                           dest="config",
@@ -320,6 +334,14 @@ class Main(object):
             ObjectStorageFD.split_size = int(self.config.get('ftpcloudfs', 'split-large-files'))*10**6
         except ValueError, errmsg:
             sys.exit('Split large files error: %s' % errmsg)
+
+        if self.config.getboolean('ftpcloudfs', 'large-object-container'):
+            try:
+                ObjectStorageFD.large_object_container_suffix = self.config.get('ftpcloudfs', 'large-object-container-suffix')
+            except ValueError:
+                sys.exit('large-object-container-suffix: invalid value, string expected')
+        else:
+            ObjectStorageFD.large_object_container_suffix = None
 
         masquerade = self.config.get('ftpcloudfs', 'masquerade-firewall')
         if masquerade:
