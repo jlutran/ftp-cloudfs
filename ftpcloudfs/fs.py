@@ -48,6 +48,8 @@ class ProxyConnection(Connection):
         self.tenant_name = None
         if kwargs.get('auth_version') == "2.0":
             self.tenant_name = kwargs['tenant_name']
+        if kwargs.get('auth_version') == "3":
+            self.tenant_name = kwargs['os_options']['project_name']
         super(ProxyConnection, self).__init__(*args, **kwargs)
 
     def http_connection(self):
