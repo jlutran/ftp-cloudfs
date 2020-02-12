@@ -1,6 +1,6 @@
 2020-02-12 Juan J. Martinez <jjm@usebox.net>
 
- * 0.37
+ * 0.37, 0.37.1
  - Added storage policy support
  - Fix for token caching in Keystone auth v3
 
