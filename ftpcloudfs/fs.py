@@ -35,7 +35,7 @@ __all__ = ['ObjectStorageFS']
 
 class ProxyConnection(Connection):
     """
-    Add X-Forwarded-For header to all requests.
+    Add custom HTTP headers to all requests.
     """
 
     # max time to cache auth tokens (seconds), based on swift defaults
@@ -60,6 +60,7 @@ class ProxyConnection(Connection):
                     headers = {}
                 if self.real_ip:
                     headers['X-Forwarded-For'] = self.real_ip
+                    headers['X-Client-IP'] = self.real_ip
                 fn(method, url, data=data, headers=headers)
             return request_header_injection
 

@@ -32,6 +32,7 @@ class ChunkObject(object):
                          }
         if conn.real_ip:
             self.headers['X-Forwarded-For'] = conn.real_ip
+            self.headers['X-Client-IP'] = conn.real_ip
 
         logging.debug("ChunkedObject: path=%r, headers=%r" % (self.path, self.headers))
 
