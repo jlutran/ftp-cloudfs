@@ -783,6 +783,7 @@ class MockupOSFS(object):
     auth_url = 'https://auth.service.fake/v1'
     username = 'user'
     hide_part_dir = False
+    storage_policy = None
 
     def __init__(self, num_objects, objects=None):
         if objects and len(objects) != num_objects:
