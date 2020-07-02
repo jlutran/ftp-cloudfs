@@ -329,7 +329,7 @@ class ObjectStorageFD(object):
     def upload_manifest(self):
         contents = []
         for part in range(self.part+1):
-            contents.append({'path': quote("%s/%s/%.8d" % (self.large_object_container, self.part_base_name, part))})
+            contents.append({'path': "%s/%s/%.8d" % (self.large_object_container, self.part_base_name, part)})
         contents = json.dumps(contents)
         if self.storage_policy is not None:
             self.headers.update({'x-storage-policy': quote(self.storage_policy)})
