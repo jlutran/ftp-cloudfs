@@ -776,8 +776,9 @@ class ListDirCache(object):
                                                     bytes=int(container["x-container-bytes-used"]),
                                                     )
                     elif flush:
-                        logging.debug("Flushing cache directory %s" % directory)
+                        logging.debug("Refresh cache directory %s" % directory)
                         self.flush(directory)
+                        self.listdir(directory)
                     else:
                         raise IOSError(ENOENT, 'No such file or directory %s' % leaf)
         else:
