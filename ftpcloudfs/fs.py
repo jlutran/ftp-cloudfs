@@ -738,12 +738,13 @@ class ListDirCache(object):
         age = time.time() - self.when
         return age < self.MAX_CACHE_TIME
 
-    def stat(self, path):
+    def stat(self, path, retry=1):
         """
         Returns an os.stat_result for path or raises IOSError.
 
         Returns the information from the cache if possible.
         """
+        flushes = [True] * retry + [False]
         path = path.rstrip("/") or "/"
         logging.debug("stat path %r" % (path))
         directory, leaf = posixpath.split(path)
@@ -751,28 +752,34 @@ class ListDirCache(object):
         if not self.valid(directory):
             logging.debug("invalid cache for %r (path: %r)" % (directory, self.path))
             self.listdir(directory)
+            # Bypass cache flush for this iteration since already done just above
+            flushes[0] and flushes.remove(True)
         if path != "/":
-            try:
-                stat_info = self.cache[smart_str(leaf)]
-            except KeyError:
-                logging.debug("Didn't find %r in directory listing" % leaf)
-                # it can be a container and the user doesn't have
-                # permissions to list the root
-                if directory == '/' and leaf:
-                    try:
-                        container = self.conn.head_container(leaf)
-                        if (self.cffs.storage_policy is not None and
-                            container['x-storage-policy'] != self.cffs.storage_policy):
+            for flush in flushes:
+                try:
+                    stat_info = self.cache[smart_str(leaf)]
+                except KeyError:
+                    logging.debug("Didn't find %r in directory listing" % leaf)
+                    # it can be a container and the user doesn't have
+                    # permissions to list the root
+                    if directory == '/' and leaf:
+                        try:
+                            container = self.conn.head_container(leaf)
+                            if (self.cffs.storage_policy is not None and
+                                container['x-storage-policy'] != self.cffs.storage_policy):
+                                raise IOSError(ENOENT, 'No such file or directory %s' % leaf)
+                        except ClientException:
                             raise IOSError(ENOENT, 'No such file or directory %s' % leaf)
-                    except ClientException:
-                        raise IOSError(ENOENT, 'No such file or directory %s' % leaf)
 
-                    logging.debug("Accessing %r container without root listing" % leaf)
-                    stat_info = self._make_stat(count=int(container["x-container-object-count"]),
-                                                bytes=int(container["x-container-bytes-used"]),
-                                                )
-                else:
-                    raise IOSError(ENOENT, 'No such file or directory %s' % leaf)
+                        logging.debug("Accessing %r container without root listing" % leaf)
+                        stat_info = self._make_stat(count=int(container["x-container-object-count"]),
+                                                    bytes=int(container["x-container-bytes-used"]),
+                                                    )
+                    elif flush:
+                        logging.debug("Flushing cache directory %s" % directory)
+                        self.flush(directory)
+                    else:
+                        raise IOSError(ENOENT, 'No such file or directory %s' % leaf)
         else:
             # Root directory size is sum of containers, count is containers
             bytes = sum(stat_info.st_size for stat_info in self.cache.values())
